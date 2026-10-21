@@ -1,0 +1,9 @@
+# Tout fichier texte est stocké ET extrait avec des fins de ligne LF,
+# même sous Windows : les scripts tournent dans des VM Linux via /vagrant.
+* text=auto eol=lf
+*.sh text eol=lf
+Vagrantfile text eol=lf
+# Fichiers binaires : jamais convertis
+*.png binary
+*.jpg binary
+*.pdf binary

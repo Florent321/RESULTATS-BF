@@ -1,0 +1,9 @@
+# État local de Vagrant (identifiants des VM, clés SSH privées)
+.vagrant/
+# Secrets réels : JAMAIS versionnés (R7)
+.env
+# Engendré par le Vagrantfile, qui reste la seule source de vérité
+config/noeuds.yml
+# Caches locaux et journaux
+.cache/
+*.log
