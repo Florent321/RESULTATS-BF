@@ -31,6 +31,24 @@ PAQUETS_BASE=(python3-yaml curl)
 log()    { printf '[%s] %s\n' "$NOM_MACHINE" "$*"; }
 erreur() { printf '[%s] ERREUR : %s\n' "$NOM_MACHINE" "$*" >&2; exit 1; }
 
+# action COMMANDE... : exécute une commande qui CHANGE l'état de la machine
+# (démarrer, redémarrer, créer…) et la journalise avec le mot ACTION.
+# Un rejeu idempotent ne contient donc aucune ligne MODIF ni ACTION (R2).
+action() { log "ACTION $*"; "$@"; }
+
+# --- Services systemd -------------------------------------------------------------
+# assurer_service UNITE [MODIFIE] : active l'unité au démarrage, la démarre si
+# elle est arrêtée, la redémarre si MODIFIE vaut 1 (configuration changée).
+assurer_service() {
+  local unite=$1 modifie=${2:-0}
+  systemctl is-enabled --quiet "$unite" 2>/dev/null || action systemctl enable --quiet "$unite"
+  if ! systemctl is-active --quiet "$unite"; then
+    action systemctl start "$unite"
+  elif (( modifie )); then
+    action systemctl restart "$unite"
+  fi
+}
+
 # --- Fichiers --------------------------------------------------------------------
 # ecrire_fichier CIBLE [MODE] [PROPRIETAIRE]   (contenu lu sur l'entrée standard)
 # N'écrit que si le contenu diffère, et positionne FICHIER_MODIFIE (1 ou 0).
@@ -62,7 +80,7 @@ ecrire_fichier() {
 paquets_du_role() {
   local supplementaires
   case $1 in
-    bdd | replique) supplementaires="" ;;   # étape 2 : postgresql
+    bdd | replique) supplementaires="postgresql" ;;   # étape 2 : PostgreSQL 16
     app)            supplementaires="" ;;   # étape 3 : application Python
     lb)             supplementaires="" ;;   # étape 4 : haproxy
     *) erreur "rôle inconnu : $1 (attendu : bdd, replique, app ou lb)" ;;
@@ -100,8 +118,7 @@ desactiver_maj_auto() {
   local unite
   for unite in apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service; do
     if systemctl is-enabled --quiet "$unite" 2>/dev/null; then
-      systemctl disable --now --quiet "$unite"
-      log "désactivé : $unite"
+      action systemctl disable --now --quiet "$unite"
     fi
   done
 }
@@ -124,6 +141,9 @@ for noeud in donnees["noeuds"]:
         print(noeud["nom"], noeud["ip"], noeud["role"])
 PY
 }
+
+# ip_de NOM : adresse privée d'une machine active (vide si elle ne l'est pas).
+ip_de() { lister_noeuds | awk -v n="$1" '$1 == n { print $2 }'; }
 
 # verifier_declaration ROLE : la machine doit être active dans noeuds.yml, avec
 # ce rôle. Empêche de démarrer app5 « à la main » sans passer par NB_APP.
