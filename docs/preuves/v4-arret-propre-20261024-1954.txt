@@ -1,0 +1,70 @@
+
+== V4 — panne de la base primaire ==
+date : 2026-10-24 19:54:28 ; commit : 0e60c3f ; service : http://192.168.69.5
+  bdd1 : interrogation par ssh direct…
+  bdd1 : primaire (3 s)
+  bdd2 : interrogation par ssh direct…
+  bdd2 : replique (2 s)
+primaire : bdd1 ; réplique : bdd2
+
+== 1. Témoin écrit avant la panne ==
+OK     témoin v4-20261024-195436 écrit sur bdd1 et déjà présent sur bdd2
+
+== 2. Panne : vagrant halt bdd1 ==
+panne visible sur /sante 27.2 s après le début de l'arrêt
+OK     reponse-repartiteur.txt : HTTP/1.1 503 SERVICE UNAVAILABLE, corps JSON {"etat":"indisponible","serveur":"app1"}
+OK     reponse-app1.txt : HTTP/1.1 503 SERVICE UNAVAILABLE, corps JSON {"etat":"indisponible","serveur":"app1"}
+arrêt de bdd1 terminé en 86.5 s
+
+== 3. Procédure de bascule (scripts/bascule.sh) ==
+lancée dès la panne constatée ; en exploitation, ajoutez le temps de réaction de l'opérateur.
+
+== 1. Diagnostic ==
+date : 2026-10-24 19:56:09 ; commit : 0e60c3f
+bdd1 : VM poweroff
+bdd2 : VM running, PostgreSQL replique (flux : aucun, reçu : 0/4021698, rejoué : 0/4021698)
+vu depuis bdd2, bdd1 (192.168.69.31) est : injoignable
+dernière transaction rejouée par bdd2 : 2026-10-24 19:54:37+00
+réplication asynchrone : une écriture validée sur bdd1 après la position 0/4021698 serait perdue.
+
+== 2. Isolement de bdd1 ==
+OK     témoin .etat/isole-bdd1 posé : au prochain vagrant up, bdd1 gardera PostgreSQL arrêté
+bdd1 est éteinte : PostgreSQL n'y démarre jamais au démarrage de la VM (start.conf = manual), et le témoin bloque le provisionnement.
+
+== 3. Promotion de bdd2 ==
+[bdd2] ACTION bdd2 promue primaire (accepte les écritures).
+OK     bdd2 promue primaire en 1.9 s
+
+== 4. Reprise du service ==
+OK     http://192.168.69.5/sante répond 200, 1.1 s après la promotion
+
+== Chronométrage (R6) ==
+diagnostic : 37.4 s ; isolement : 0.3 s ; promotion : 1.9 s ; reprise du service : 1.1 s
+durée totale de la procédure : 40.6 s
+ligne ajoutée à mesures/bascules.csv
+Ensuite, pour retrouver une réplique : bash scripts/reintegrer.sh bdd1
+
+== Bilan ==
+Bascule vers bdd2 : VALIDÉ (aucun échec).
+OK     bascule terminée en 41.6 s
+
+== 4. Après la bascule ==
+OK     bdd2 est la nouvelle primaire
+OK     le témoin écrit avant la panne est sur bdd2 (aucune perte pour ce qui était répliqué)
+OK     bdd2 accepte les écritures
+
+== 5. Sonde /sante (une requête toutes les 0,5 s) ==
+requêtes de la sonde : 166, en erreur (code différent de 200) : 125
+réponse la plus lente : 0.41 s (à t = +26.7 s)
+première erreur : t = +26.7 s ; dernière : t = +126.8 s
+période dégradée (première à dernière erreur) : 100.2 s
+(t = 0 : instant de la panne)
+réponses en erreur, par code (code:nombre) : 503:125 
+OK     toutes les erreurs sont des 503 (aucune page blanche, aucune connexion refusée)
+sonde : première erreur 26.7 s après le début de l'arrêt, dernière à 126.8 s ; service indisponible pendant 101.0 s
+durée de la procédure de bascule (mesure demandée par l'énoncé) : 41.6 s
+sorties brutes : mesures/v4-20261024-195428/ ; ligne ajoutée à mesures/v4.csv
+bdd1 reste isolée. Pour la réintégrer : bash scripts/reintegrer.sh bdd1
+
+== Bilan ==
+V4 : VALIDÉ (aucun échec).

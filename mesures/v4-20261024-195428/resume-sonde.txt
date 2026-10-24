@@ -1,0 +1,5 @@
+requêtes de la sonde : 166, en erreur (code différent de 200) : 125
+réponse la plus lente : 0.41 s (à t = +26.7 s)
+première erreur : t = +26.7 s ; dernière : t = +126.8 s
+période dégradée (première à dernière erreur) : 100.2 s
+(t = 0 : instant de la panne)

@@ -1,0 +1,28 @@
+
+== 1. Diagnostic ==
+date : 2026-10-24 19:56:09 ; commit : 0e60c3f
+bdd1 : VM poweroff
+bdd2 : VM running, PostgreSQL replique (flux : aucun, reçu : 0/4021698, rejoué : 0/4021698)
+vu depuis bdd2, bdd1 (192.168.69.31) est : injoignable
+dernière transaction rejouée par bdd2 : 2026-10-24 19:54:37+00
+réplication asynchrone : une écriture validée sur bdd1 après la position 0/4021698 serait perdue.
+
+== 2. Isolement de bdd1 ==
+OK     témoin .etat/isole-bdd1 posé : au prochain vagrant up, bdd1 gardera PostgreSQL arrêté
+bdd1 est éteinte : PostgreSQL n'y démarre jamais au démarrage de la VM (start.conf = manual), et le témoin bloque le provisionnement.
+
+== 3. Promotion de bdd2 ==
+[bdd2] ACTION bdd2 promue primaire (accepte les écritures).
+OK     bdd2 promue primaire en 1.9 s
+
+== 4. Reprise du service ==
+OK     http://192.168.69.5/sante répond 200, 1.1 s après la promotion
+
+== Chronométrage (R6) ==
+diagnostic : 37.4 s ; isolement : 0.3 s ; promotion : 1.9 s ; reprise du service : 1.1 s
+durée totale de la procédure : 40.6 s
+ligne ajoutée à mesures/bascules.csv
+Ensuite, pour retrouver une réplique : bash scripts/reintegrer.sh bdd1
+
+== Bilan ==
+Bascule vers bdd2 : VALIDÉ (aucun échec).
