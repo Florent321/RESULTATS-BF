@@ -81,8 +81,10 @@ paquets_du_role() {
   local supplementaires
   case $1 in
     bdd | replique) supplementaires="postgresql" ;;   # étape 2 : PostgreSQL 16
-    app)            supplementaires="" ;;   # étape 3 : application Python
-    lb)             supplementaires="" ;;   # étape 4 : haproxy
+    app)            supplementaires="python3-flask python3-psycopg python3-gunicorn" ;;   # étape 3
+    lb)             supplementaires="haproxy"   # étape 4
+                    # Étape 6 (E1) : keepalived seulement si une IP virtuelle est déclarée.
+                    if [[ -n $(vip_declaree) ]]; then supplementaires+=" keepalived"; fi ;;
     *) erreur "rôle inconnu : $1 (attendu : bdd, replique, app ou lb)" ;;
   esac
   echo "${PAQUETS_BASE[*]} $supplementaires"
@@ -145,6 +147,13 @@ PY
 # ip_de NOM : adresse privée d'une machine active (vide si elle ne l'est pas).
 ip_de() { lister_noeuds | awk -v n="$1" '$1 == n { print $2 }'; }
 
+# vip_declaree : IP virtuelle des répartiteurs (extension E1), vide sans E1.
+# Lue avec awk : utilisable avant l'installation de python3-yaml (commun.sh).
+vip_declaree() {
+  [[ -r $FICHIER_NOEUDS ]] || return 0
+  awk '/^vip: / { print $2 }' "$FICHIER_NOEUDS" | tr -d '\r'
+}
+
 # verifier_declaration ROLE : la machine doit être active dans noeuds.yml, avec
 # ce rôle. Empêche de démarrer app5 « à la main » sans passer par NB_APP.
 verifier_declaration() {
@@ -201,4 +210,44 @@ attendre_port() {
     sleep 2
   done
   log "$hote:$port joignable."
+}
+
+# --- Interface d'administration de HAProxy (répartiteurs seulement) ------------------
+SOCKET_HAPROXY=/run/haproxy/admin.sock
+
+# api_haproxy COMMANDE : envoie une commande à HAProxy par son socket local
+# (« show stat », « set server be_app/app1 state drain »…) et affiche la réponse.
+api_haproxy() {
+  python3 - "$SOCKET_HAPROXY" "$1" <<'PY'
+import socket
+import sys
+
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+    s.settimeout(5)
+    s.connect(sys.argv[1])
+    s.sendall((sys.argv[2] + "\n").encode())
+    morceaux = []
+    while morceau := s.recv(65536):
+        morceaux.append(morceau)
+sys.stdout.write(b"".join(morceaux).decode())
+PY
+}
+
+# etat_serveurs_haproxy : « serveur état sessions_en_cours » pour chaque serveur de be_app.
+etat_serveurs_haproxy() {
+  api_haproxy "show stat" | awk -F, '
+    NR == 1 { for (i = 1; i <= NF; i++) { c = $i; sub(/^# /, "", c); col[c] = i }; next }
+    $1 == "be_app" && $2 != "BACKEND" && $2 != "FRONTEND" { print $2, $(col["status"]), $(col["scur"]) }'
+}
+
+# code_http URL : code de réponse HTTP (000 si aucune réponse en 5 s).
+code_http() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$1" || true; }
+
+# attendre_code_http URL CODE [DELAI_S] : vrai dès que URL répond CODE.
+attendre_code_http() {
+  local url=$1 attendu=$2 delai=${3:-30} debut=$SECONDS
+  until [[ $(code_http "$url") == "$attendu" ]]; do
+    (( SECONDS - debut < delai )) || return 1
+    sleep 1
+  done
 }

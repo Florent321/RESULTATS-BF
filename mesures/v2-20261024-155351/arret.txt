@@ -1,0 +1,6 @@
+==> app1: Attempting graceful shutdown of VM...
+    app1: Guest communication could not be established! This is usually because
+    app1: SSH is not running, the authentication information was changed,
+    app1: or some other networking issue. Vagrant will force halt, if
+    app1: capable.
+==> app1: Forcing shutdown of VM...
