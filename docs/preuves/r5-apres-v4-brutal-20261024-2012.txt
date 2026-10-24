@@ -1,0 +1,28 @@
+R5 — réplication en flux : 2026-10-24 20:12:28, commit c1fd64c
+
+== 0. Rôles actuels ==
+  bdd1 : interrogation par ssh direct…
+  bdd1 : primaire (2 s)
+  bdd2 : interrogation par ssh direct…
+  bdd2 : replique (3 s)
+primaire : bdd1 ; réplique : bdd2
+
+== 1. Écriture sur le primaire (bdd1) ==
+requête : INSERT INTO preuve_replication (jeton) VALUES ('r5-20261024-201235-26038') RETURNING id, ecrit_le
+OK     écrit sur bdd1 : 71|2026-10-24 20:12:35.902181+00
+
+== 2. Lecture sur la réplique (bdd2) ==
+OK     lu sur bdd2 : 71|2026-10-24 20:12:35.902181+00 (identique)
+
+== 3. La réplique refuse les écritures ==
+réponse : ERROR:  cannot execute INSERT in a read-only transaction
+OK     écriture refusée (lecture seule)
+
+== 4. Flux vu du primaire (pg_stat_replication) ==
+bdd2|192.168.69.32|streaming|async|00:00:00.045587
+
+== 5. Retard de la réplique ==
+dernière transaction rejouée il y a : 00:00:05.604087
+
+== Bilan ==
+R5 : VALIDÉ (aucun échec).
