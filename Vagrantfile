@@ -7,12 +7,14 @@
 # Toute machine, adresse IP et taille mémoire est décrite ICI, et nulle part
 # ailleurs. À chaque commande vagrant, ce fichier engendre :
 #   - config/noeuds.yml : les machines actives, lues par les scripts
-#     (/etc/hosts dès l'étape 1, configuration HAProxy à l'étape 4) ;
+#     (/etc/hosts dès l'étape 1, configuration HAProxy à l'étape 4,
+#     IP virtuelle de keepalived avec l'extension E1) ;
 #   - .env : les secrets manquants, tirés au hasard (jamais versionnés).
 #
 # Paramètres, sur la ligne de commande (Git Bash) :
 #   NB_APP=4 vagrant up    nombre de serveurs applicatifs, de 2 à 9
-#   GROUPE=14 vagrant up    numéro de groupe, de 1 à 20 (défaut ci-dessous)
+#   GROUPE=14 vagrant up   numéro de groupe, de 1 à 20 (sinon : config/groupe)
+#   E1=0 vagrant up        sans l'extension E1 (lb2 et IP virtuelle) : socle seul, 3 Go
 # =============================================================================
 
 Vagrant.require_version ">= 2.4.0"
@@ -22,15 +24,17 @@ require "securerandom"
 require "yaml"
 
 # --- 1. Paramètres ------------------------------------------------------------
-GROUPE_PAR_DEFAUT = 14   # <-- À REMPLACER par votre numéro de groupe (1 à 8)
+# Dossier du Vagrantfile : les chemins ne dépendent pas du dossier courant.
+RACINE = File.expand_path(File.dirname(__FILE__))
+
+# Le numéro de groupe vit dans le petit fichier versionné config/groupe (un
+# nombre de 1 à 20) : remplacer le Vagrantfile ne l'efface donc jamais.
+FICHIER_GROUPE    = File.join(RACINE, "config", "groupe")
 NB_APP_PAR_DEFAUT = 2
 NB_APP_MAX        = 9   # app1..app9 = .21 à .29 ; au-delà, collision avec bdd1 (.31)
 
 BOITE         = "bento/ubuntu-24.04"
 VERSION_BOITE = "202510.26.0"   # épinglée : identique pour les quatre membres
-
-# Dossier du Vagrantfile : les chemins ne dépendent pas du dossier courant.
-RACINE = File.expand_path(File.dirname(__FILE__))
 
 # Fonctions rangées dans un module : une méthode définie au premier niveau
 # d'un Vagrantfile devient globale et peut entrer en conflit avec Vagrant.
@@ -98,9 +102,26 @@ module ResultatsBF
   end
 end
 
-GROUPE = ResultatsBF.parametre_entier("GROUPE", GROUPE_PAR_DEFAUT, 1, 20)
+groupe_lu = File.exist?(FICHIER_GROUPE) ? File.binread(FICHIER_GROUPE).delete("^0-9") : ""
+if ENV.fetch("GROUPE", "").strip.empty? && groupe_lu.empty?
+  abort "ERREUR : numéro de groupe inconnu. Dans Git Bash, à la racine du dépôt :\n" \
+        "  echo 14 > config/groupe    (votre numéro de groupe)\n" \
+        "puis commitez ce fichier : tous les membres utilisent le même."
+end
+GROUPE = ResultatsBF.parametre_entier("GROUPE", groupe_lu, 1, 20)
 NB_APP = ResultatsBF.parametre_entier("NB_APP", NB_APP_PAR_DEFAUT, 2, NB_APP_MAX)
-RESEAU = "192.168.#{55 + GROUPE}"   # plage imposée 192.168.56.0/21 (énoncé §7.1)
+# Extension E1 (énoncé §5) : second répartiteur lb2 et IP virtuelle .5 (VRRP).
+# Active par défaut (+512 Mo, 3,5 Go en tout) ; E1=0 revient au socle seul.
+E1     = ResultatsBF.parametre_entier("E1", 1, 0, 1)
+RESEAU = "192.168.#{55 + GROUPE}"   # X = 55 + G (énoncé §7.1)
+# L'énoncé prévoit les groupes 1 à 8, soit 192.168.56.0 à 192.168.63.255 : la seule
+# plage que VirtualBox accepte sans réglage sur un hôte Linux ou macOS. Sous Windows,
+# VirtualBox accepte aussi les numéros suivants (192.168.64.x et au-delà).
+if GROUPE > 8 && %w[up reload provision].include?(ARGV.first)
+  warn "ATTENTION : groupe #{GROUPE}, réseau #{RESEAU}.0/24, hors de la plage 192.168.56.0/21 " \
+       "de l'énoncé (§7.1). VirtualBox l'accepte sous Windows, pas sous Linux ni macOS : " \
+       "faites valider ce réseau par l'enseignant."
+end
 
 # --- 2. Inventaire des machines (énoncé §3.1) ------------------------------------
 # L'ordre compte : vagrant up démarre les machines dans cet ordre.
@@ -113,18 +134,21 @@ MACHINES << ResultatsBF.machine(RESEAU, "bdd2", 32, 768, "replique")
   MACHINES << ResultatsBF.machine(RESEAU, "app#{i}", 20 + i, 512, "app", i <= NB_APP)
 end
 MACHINES << ResultatsBF.machine(RESEAU, "lb1", 11, 512, "lb")
+MACHINES << ResultatsBF.machine(RESEAU, "lb2", 12, 512, "lb", E1 == 1)
 
 # Les machines ACTIVES forment la source de vérité transmise aux scripts.
 NOEUDS = MACHINES.select { |m| m["actif"] }
                  .map { |m| m.reject { |cle, _| cle == "actif" } }
 
 # --- 3. Fichiers engendrés -----------------------------------------------------
+INVENTAIRE = { "groupe" => GROUPE, "reseau" => "#{RESEAU}.0/24", "nb_app" => NB_APP }
+INVENTAIRE["vip"] = "#{RESEAU}.5" if E1 == 1   # IP virtuelle portée par lb1 ou lb2
+INVENTAIRE["noeuds"] = NOEUDS
 ResultatsBF.ecrire_si_different(
   File.join(RACINE, "config", "noeuds.yml"),
   "# Fichier ENGENDRÉ par le Vagrantfile à chaque commande vagrant.\n" \
   "# Ne pas le modifier à la main : modifier le Vagrantfile.\n" +
-  { "groupe" => GROUPE, "reseau" => "#{RESEAU}.0/24",
-    "nb_app" => NB_APP, "noeuds" => NOEUDS }.to_yaml
+  INVENTAIRE.to_yaml
 )
 ResultatsBF.completer_secrets(RACINE)
 
@@ -154,10 +178,11 @@ Vagrant.configure("2") do |config|
       m.vm.hostname = n["nom"]
       m.vm.network "private_network", ip: n["ip"]
 
-      if n["role"] == "lb"
+      if n["nom"] == "lb1"
         # R8 : seul le répartiteur expose un port vers l'hôte, et seulement
         # sur l'hôte lui-même (127.0.0.1). auto_correct : si 8080 est déjà
         # pris, Vagrant choisit un autre port au lieu d'échouer (R1).
+        # lb2 n'en expose pas : avec E1, l'adresse du service est l'IP virtuelle.
         m.vm.network "forwarded_port", id: "http", guest: 80, host: 8080,
                      host_ip: "127.0.0.1", auto_correct: true
       end
@@ -166,14 +191,31 @@ Vagrant.configure("2") do |config|
         vb.memory = n["mem"]
       end
 
-      # 1) Socle commun, rejoué à CHAQUE vagrant up : il doit rester idempotent.
+      if %w[bdd replique].include?(n["role"])
+        # Étape 5 : une base DÉTRUITE repartira de zéro ; son témoin d'isolement
+        # (.etat/isole-NOM, posé par scripts/bascule.sh) n'a plus d'objet.
+        # Le déclencheur s'exécute même si l'on répond « non » à vagrant destroy :
+        # on ne retire donc le témoin que si la VM n'existe vraiment plus.
+        m.trigger.after :destroy do |t|
+          t.ruby do |_env, machine|
+            temoin = File.join(RACINE, ".etat", "isole-#{n['nom']}")
+            if machine.state.id == :not_created && File.exist?(temoin)
+              FileUtils.rm_f(temoin)
+              puts "==> #{n['nom']}: témoin d'isolement retiré (la base repartira de zéro)."
+            end
+          end
+        end
+      end
+
+      # Les deux provisionneurs sont rejoués à CHAQUE vagrant up (run: "always") :
+      # les configurations engendrées (pg_hba.conf, HAProxy…) suivent ainsi
+      # NB_APP sans geste manuel. Contrepartie : tout doit être idempotent (R2).
+      # 1) Socle commun : paquets, /etc/hosts.
       m.vm.provision "commun", type: "shell", path: "scripts/commun.sh",
                      args: [n["role"]], run: "always"
-
-      # 2) Script du rôle. Celui du répartiteur est rejoué à chaque vagrant up
-      #    pour que sa configuration suive NB_APP (exigence R3, étape 4).
+      # 2) Script du rôle : bdd.sh, replique.sh, app.sh ou lb.sh.
       m.vm.provision "role", type: "shell", path: "scripts/#{n['role']}.sh",
-                     run: (n["role"] == "lb" ? "always" : "once")
+                     run: "always"
     end
   end
 end

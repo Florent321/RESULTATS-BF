@@ -1,0 +1,56 @@
+# =============================================================================
+# config/keepalived.conf.modele — IP virtuelle partagée par lb1 et lb2 (E1)
+# =============================================================================
+# Ce modèle ne contient AUCUNE adresse : scripts/lb.sh remplace les marqueurs
+# @@…@@ depuis config/noeuds.yml (IP virtuelle, adresses des répartiteurs),
+# puis écrit le résultat dans /etc/keepalived/keepalived.conf.
+# VRRP : le répartiteur MAÎTRE porte l'IP virtuelle et l'annonce toutes les
+# 0,5 s. Si ses annonces cessent pendant ~1,8 s, l'autre la reprend et
+# l'annonce au réseau (ARP gratuit) : les clients gardent la même adresse.
+# =============================================================================
+
+global_defs {
+    router_id @@NOM@@
+    # Le script de contrôle tourne sous un utilisateur sans droits.
+    script_user keepalived_script
+    enable_script_security
+    # VRRP version 3 : autorise des annonces plus fréquentes qu'une par seconde.
+    vrrp_version 3
+}
+
+# HAProxy répond-il sur cette machine ? /lb-sante est servi par HAProxy
+# lui-même (monitor-uri), sans dépendre des serveurs applicatifs.
+vrrp_script haproxy_vivant {
+    script "/usr/bin/curl -fs -o /dev/null --max-time 1 http://127.0.0.1/lb-sante"
+    interval 1
+    timeout 2
+    fall 2
+    rise 2
+}
+
+vrrp_instance VIP_RESULTATS {
+    # Les deux répartiteurs démarrent BACKUP ; la plus haute priorité gagne
+    # l'élection. nopreempt : un répartiteur qui revient ne reprend PAS l'IP
+    # au maître en place (cela ferait une coupure de plus).
+    state BACKUP
+    nopreempt
+    interface @@INTERFACE@@
+    virtual_router_id @@VRID@@
+    priority @@PRIORITE@@
+    advert_int 0.5
+    # Annonces en unicast vers l'autre répartiteur, et seules les annonces
+    # venant de lui sont acceptées. Pas d'authentification VRRP : en version 2
+    # le mot de passe circule en clair, et la version 3 l'a supprimée.
+    unicast_src_ip @@IP_PRIVEE@@
+    unicast_peer {
+@@PAIRS@@
+    }
+    check_unicast_src
+    virtual_ipaddress {
+        @@VIP@@/24 dev @@INTERFACE@@
+    }
+    # HAProxy arrêté ou muet : ce répartiteur passe en FAULT et cède l'IP.
+    track_script {
+        haproxy_vivant
+    }
+}

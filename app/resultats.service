@@ -1,0 +1,32 @@
+# =============================================================================
+# app/resultats.service — unité systemd du service applicatif (étape 3)
+# =============================================================================
+# Installée par scripts/app.sh dans /etc/systemd/system/.
+# Le code est COPIÉ dans /opt/resultats-bf/app : au démarrage de la VM, le
+# dossier synchronisé /vagrant n'est pas encore monté (Vagrant le monte après).
+# =============================================================================
+[Unit]
+Description=RÉSULTATS-BF, consultation des résultats (Gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=resultats
+Group=resultats
+# Variables de connexion et mot de passe : fichier lisible par root seulement,
+# lu par systemd AVANT de passer à l'utilisateur resultats.
+EnvironmentFile=/etc/resultats-bf/app.env
+WorkingDirectory=/opt/resultats-bf/app
+# Écoute sur 0.0.0.0 : joignable par le répartiteur (énoncé §12, premier piège).
+ExecStart=/usr/bin/python3 -m gunicorn --bind ${APP_ECOUTE} --workers ${APP_PROCESSUS} --timeout 30 --graceful-timeout 10 app:app
+Restart=always
+RestartSec=2
+# Durcissement : le service ne peut rien écrire sur le système.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

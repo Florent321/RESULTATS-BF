@@ -9,6 +9,8 @@
 # =============================================================================
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
+# Pas de vérification de version de Vagrant avant chaque commande (jusqu'à 10 s).
+export VAGRANT_CHECKPOINT_DISABLE=1
 
 ECHECS=0
 ok()    { echo "OK     $*"; }
@@ -23,17 +25,18 @@ echo "Socle RÉSULTATS-BF : $(date '+%Y-%m-%d %H:%M:%S')," \
 titre "1. Machines démarrées (d'après Vagrant)"
 mapfile -t ACTIVES < <(vagrant status --machine-readable 2>/dev/null | tr -d '\r' \
   | awk -F, '$3 == "state" && $4 == "running" { print $2 }')
-if (( ${#ACTIVES[@]} >= 5 )); then
+ATTENDUES=$(grep -c '^- nom: ' config/noeuds.yml)
+if (( ${#ACTIVES[@]} >= ATTENDUES )); then
   ok "${#ACTIVES[@]} machines démarrées : ${ACTIVES[*]}"
 else
-  echec "${#ACTIVES[@]} machine(s) démarrée(s), 5 attendues : ${ACTIVES[*]:-aucune}"
+  echec "${#ACTIVES[@]} machine(s) démarrée(s), $ATTENDUES attendues : ${ACTIVES[*]:-aucune}"
 fi
 
 # --- 2 -----------------------------------------------------------------------
 titre "2. Noms et réseau privé, vus de chaque machine"
 declare -A EMPREINTE=()
 for m in "${ACTIVES[@]}"; do
-  sortie=$(vagrant ssh "$m" -c "bash /vagrant/tests/noeud.sh" 2>/dev/null | tr -d '\r')
+  sortie=$(vagrant ssh "$m" --no-tty -c "bash /vagrant/tests/noeud.sh" -- -q </dev/null 2>/dev/null | tr -d '\r')
   while IFS= read -r ligne; do
     case $ligne in
       "OK "*)        ok "${ligne#OK }" ;;
@@ -50,12 +53,12 @@ JOURNAUX=$(mktemp -d)
 for passe in 1 2; do
   journal="$JOURNAUX/passe$passe.log"
   if vagrant provision >"$journal" 2>&1; then
-    modifs=$(tr -d '\r' <"$journal" | grep -c "MODIF ")
+    modifs=$(tr -d '\r' <"$journal" | grep -cE "(MODIF|ACTION) ")
     if (( modifs == 0 )); then
-      ok "passe $passe : réussie, aucun fichier modifié"
+      ok "passe $passe : réussie, aucune modification ni action"
     else
-      echec "passe $passe : $modifs fichier(s) modifié(s) :"
-      tr -d '\r' <"$journal" | grep "MODIF " | sed 's/^/         /'
+      echec "passe $passe : $modifs modification(s) ou action(s) :"
+      tr -d '\r' <"$journal" | grep -E "(MODIF|ACTION) " | sed 's/^/         /'
     fi
   else
     echec "passe $passe : vagrant provision a échoué (journal : $journal)"
@@ -65,7 +68,7 @@ done
 # --- 4 -----------------------------------------------------------------------
 titre "4. Empreinte de /etc/hosts inchangée après les deux passes"
 for m in "${ACTIVES[@]}"; do
-  apres=$(vagrant ssh "$m" -c "sha256sum /etc/hosts | cut -c1-16" 2>/dev/null | tr -d '\r')
+  apres=$(vagrant ssh "$m" --no-tty -c "sha256sum /etc/hosts | cut -c1-16" -- -q </dev/null 2>/dev/null | tr -d '\r')
   avant=${EMPREINTE[$m]:-?}
   if [[ $apres == "$avant" ]]; then
     ok "$m : $apres"
@@ -75,17 +78,27 @@ for m in "${ACTIVES[@]}"; do
 done
 
 # --- 5 -----------------------------------------------------------------------
-titre "5. Paramètres NB_APP et GROUPE (R3) et garde-fous"
+titre "5. Paramètres NB_APP, GROUPE et E1 (R3) et garde-fous"
 compter_apps() { grep -c "role: app" config/noeuds.yml; }
+# Plage de l'énoncé (§7.1) : groupes 1 à 8, 192.168.56.0 à 192.168.63.255. Au-delà,
+# seul VirtualBox sous Windows accepte le réseau : signalé, sans compter comme échec.
+reseau_groupe=$(awk '/^reseau: / { print $2 }' config/noeuds.yml)
+case $reseau_groupe in
+  192.168.5[6-9].0/24 | 192.168.6[0-3].0/24)
+    ok "réseau $reseau_groupe dans la plage de l'énoncé (192.168.56.0/21)" ;;
+  *)
+    echo "ATTENTION  réseau $reseau_groupe hors de la plage de l'énoncé (192.168.56.0/21) :" \
+         "accepté par VirtualBox sous Windows seulement ; à faire valider par l'enseignant" ;;
+esac
 if NB_APP=12 vagrant status >/dev/null 2>&1; then
   echec "NB_APP=12 accepté"
 else
-  ok "NB_APP=12 refusé (au-delà de 20 : collision d'adresses avec bdd1)"
+  ok "NB_APP=12 refusé (au-delà de 9 : collision d'adresses avec bdd1)"
 fi
-if GROUPE=20 vagrant status >/dev/null 2>&1; then
-  echec "GROUPE=20 accepté"
+if GROUPE=21 vagrant status >/dev/null 2>&1; then
+  echec "GROUPE=21 accepté"
 else
-  ok "GROUPE=20 refusé (groupes 1 à 20)"
+  ok "GROUPE=21 refusé (groupes 1 à 20)"
 fi
 NB_APP=4 vagrant status >/dev/null 2>&1
 avec4=$(compter_apps)
@@ -96,6 +109,18 @@ if [[ $avec4 == 4 && $defaut == 2 ]]; then
   ok "noeuds.yml suit NB_APP : 4 serveurs avec NB_APP=4, 2 par défaut"
 else
   echec "noeuds.yml ne suit pas NB_APP : $avec4 avec NB_APP=4, $defaut par défaut"
+fi
+# Extension E1 (étape 6) : lb2 et l'IP virtuelle n'existent qu'avec E1=1 (défaut).
+if E1=2 vagrant status >/dev/null 2>&1; then echec "E1=2 accepté"; else ok "E1=2 refusé (0 ou 1)"; fi
+E1=0 vagrant status >/dev/null 2>&1
+sans_e1=$(grep -cE '^vip: |nom: lb2' config/noeuds.yml)
+env -u E1 vagrant status >/dev/null 2>&1
+avec_e1=$(grep -cE '^vip: |nom: lb2' config/noeuds.yml)
+vagrant status >/dev/null 2>&1   # remet noeuds.yml dans l'état de cette session
+if [[ $sans_e1 == 0 && $avec_e1 == 2 ]]; then
+  ok "noeuds.yml suit E1 : lb2 et IP virtuelle par défaut, ni l'un ni l'autre avec E1=0"
+else
+  echec "noeuds.yml ne suit pas E1 ($avec_e1 ligne(s) par défaut, $sans_e1 avec E1=0)"
 fi
 
 # --- 6 -----------------------------------------------------------------------
