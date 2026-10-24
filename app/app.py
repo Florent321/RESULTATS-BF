@@ -8,7 +8,6 @@ PGDATABASE, PGUSER, PGPASSWORD, PGOPTIONS.
 import os
 import socket
 import threading
-import time
 
 import psycopg
 from flask import Flask, jsonify, request
@@ -21,7 +20,7 @@ VERSION = os.environ.get("APP_VERSION", "inconnue")
 PARAMETRES_BASE = {
     "target_session_attrs": "read-write",  # n'accepter que la base primaire
     "connect_timeout": 2,                  # secondes, pour CHAQUE hôte essayé
-    "tcp_user_timeout": 2000,              # ms : la base disparaît en pleine requête
+    "tcp_user_timeout": 3000,              # ms : la base disparaît en pleine requête
     "keepalives": 1, "keepalives_idle": 5, "keepalives_interval": 2, "keepalives_count": 2,
     "application_name": f"resultats@{HOTE}",
 }
@@ -35,13 +34,10 @@ def _oublier_connexion():
 
 
 def interroger(sql, parametres=()):
-    """Exécute une requête de lecture. Une connexion ANCIENNE qui échoue VITE (base
-    redémarrée : connexion fermée) est remplacée une seule fois. Une panne LENTE
-    (base disparue, 2 s d'attente) n'est pas retentée : la 503 part en ~2 s, bien
-    avant le délai de 5 s du répartiteur. Toute autre erreur remonte."""
+    """Exécute une requête de lecture. Une connexion ANCIENNE trouvée morte (base
+    redémarrée, bascule) est remplacée une seule fois ; toute autre erreur remonte."""
     for essai in (1, 2):
         ancienne = getattr(_fil, "cnx", None) is not None and not _fil.cnx.closed
-        debut = time.monotonic()
         try:
             if not ancienne:
                 _fil.cnx = psycopg.connect(autocommit=True, **PARAMETRES_BASE)
@@ -50,7 +46,7 @@ def interroger(sql, parametres=()):
                 return curseur.fetchone()
         except psycopg.OperationalError:
             _oublier_connexion()
-            if not ancienne or essai == 2 or time.monotonic() - debut > 1:
+            if not ancienne or essai == 2:
                 raise
         except psycopg.Error:
             _oublier_connexion()
