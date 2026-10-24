@@ -1,0 +1,38 @@
+== app sur 192.168.69.21 ==
+-- /info
+{"serveur":"app1","version":"1.0.0"}
+
+-- /resultat connu
+{"admis":true,"matricule":"BF-2026-000123","moyenne":15.51,"nom":"ZONGO Ramatou","serie":"E"}
+
+-- /resultat inconnu (404 attendu)
+404
+-- /sante (200 attendu après retour des bases)
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 24 Oct 2026 19:13:51 GMT
+Connection: close
+Content-Type: application/json
+Content-Length: 31
+
+{"etat":"ok","serveur":"app1"}
+
+== app sur 192.168.69.22 ==
+-- /info
+{"serveur":"app2","version":"1.0.0"}
+
+-- /resultat connu
+{"admis":true,"matricule":"BF-2026-000123","moyenne":15.51,"nom":"ZONGO Ramatou","serie":"E"}
+
+-- /resultat inconnu (404 attendu)
+404
+-- /sante (200 attendu après retour des bases)
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 24 Oct 2026 19:13:52 GMT
+Connection: close
+Content-Type: application/json
+Content-Length: 31
+
+{"etat":"ok","serveur":"app2"}
+
