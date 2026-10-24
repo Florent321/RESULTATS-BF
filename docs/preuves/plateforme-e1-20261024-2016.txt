@@ -1,0 +1,40 @@
+Plateforme RÉSULTATS-BF : 2026-10-24 20:16:06, commit e3a120e, service http://192.168.69.5, 2 serveur(s) applicatif(s)
+
+== 1. Le service répond par le répartiteur ==
+OK     GET /resultat : 200, {"admis":true,"matricule":"BF-2026-000123","moyenne":15.51,"nom":"ZONGO Ramatou","serie":"E"}
+OK     GET /sante : 200
+OK     matricule inconnu : 404
+OK     matricule absent : 400
+
+== 2. Tous les serveurs déclarés répondent (/info) ==
+OK     app1 a répondu
+OK     app2 a répondu
+
+== 3. Répartiteur : configuration engendrée et sonde (R3, R4) ==
+OK     le modèle HAProxy ne contient aucune adresse IP
+OK     lb1 : « server app1 192.168.69.21:3000 check » présent
+OK     lb1 : app1 UP
+OK     lb1 : « server app2 192.168.69.22:3000 check » présent
+OK     lb1 : app2 UP
+OK     lb1 : 2 serveur(s), autant que dans noeuds.yml
+OK     lb2 : « server app1 192.168.69.21:3000 check » présent
+OK     lb2 : app1 UP
+OK     lb2 : « server app2 192.168.69.22:3000 check » présent
+OK     lb2 : app2 UP
+OK     lb2 : 2 serveur(s), autant que dans noeuds.yml
+
+== 4. Réplication (R5) ==
+OK     bdd1 est primaire, 1 réplique(s) en flux
+
+== 5. Redirection de port de l'hôte (R8) ==
+OK     http://127.0.0.1:8080/info : 200 (seul port redirigé, vers lb1)
+
+== 6. IP virtuelle des répartiteurs (extension E1) ==
+OK     le modèle keepalived ne contient aucune adresse IP (hors 127.0.0.1)
+OK     lb1 : keepalived actif
+OK     lb2 : keepalived actif
+OK     un seul répartiteur porte 192.168.69.5 : lb1
+OK     http://192.168.69.5/lb-sante : répondu par lb1
+
+== Bilan ==
+Plateforme : VALIDÉ (aucun échec).
