@@ -1,0 +1,25 @@
+
+== 1. Primaire actuelle ==
+primaire actuelle : bdd2 ; à réintégrer : bdd1
+
+== 2. Confirmation ==
+ATTENTION — opération DESTRUCTIVE pour bdd1 : ses données PostgreSQL seront
+remplacées par une copie de bdd2 (les anciennes restent dans la VM, dossier
+/var/lib/postgresql/16/main.avant-reintegration-DATE).
+Tapez OUI pour continuer : 
+== 3. Recopie depuis bdd2 ==
+[bdd1] 192.168.69.32:5432 joignable.
+[bdd1] clonage du primaire 192.168.69.32 vers bdd1 (pg_basebackup)…
+[bdd1] ACTION mv /var/lib/postgresql/16/main /var/lib/postgresql/16/main.avant-reintegration-20261024-200410
+[bdd1] ACTION runuser -u postgres -- pg_basebackup -w -D /var/lib/postgresql/16/main -d host=192.168.69.32 port=5432 user=replicateur application_name=bdd1 --wal-method=stream --checkpoint=fast --write-recovery-conf --slot=slot_bdd1
+[bdd1] ACTION systemctl start postgresql@16-main
+[bdd1] réplique : flux streaming depuis 192.168.69.32
+OK     isolement de bdd1 levé
+
+== 4. Vérification ==
+OK     bdd1 est réplique
+OK     bdd2 envoie son journal à bdd1 (streaming)
+durée de la réintégration : 104.8 s (confirmation comprise)
+
+== Bilan ==
+Réintégration de bdd1 : VALIDÉ (aucun échec).
