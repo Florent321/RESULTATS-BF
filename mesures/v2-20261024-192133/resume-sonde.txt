@@ -1,0 +1,4 @@
+requêtes de la sonde : 56, en erreur (code différent de 200) : 0
+réponse la plus lente : 0.45 s (à t = +31.0 s)
+aucune erreur pendant toute la sonde
+(t = 0 : instant de la panne)
