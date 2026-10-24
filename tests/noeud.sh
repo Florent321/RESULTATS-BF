@@ -16,13 +16,15 @@ if ! noeuds=$(lister_noeuds); then
   exit 1
 fi
 
-# joignable NOM : ping si disponible, sinon connexion TCP au port SSH (22),
-# ouvert sur toutes les VM.
+# joignable NOM : ping si disponible, sinon tentative TCP sur le port 22. Une
+# connexion acceptée OU refusée prouve que la machine répond ; seul le silence
+# (délai dépassé, code 124) signifie qu'elle est injoignable.
 joignable() {
   if command -v ping >/dev/null 2>&1; then
     ping -c 1 -W 2 "$1" >/dev/null 2>&1
   else
     timeout 2 bash -c "exec 3<>/dev/tcp/$1/22" 2>/dev/null
+    (( $? != 124 ))
   fi
 }
 

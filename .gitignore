@@ -7,3 +7,8 @@ config/noeuds.yml
 # Caches locaux et journaux
 .cache/
 *.log
+# Caches Python
+__pycache__/
+*.pyc
+# Témoins d'isolement des bases (scripts/bascule.sh) : état local du poste
+.etat/

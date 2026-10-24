@@ -1,0 +1,72 @@
+# =============================================================================
+# config/haproxy.cfg.modele — modèle de configuration HAProxy (étape 4)
+# =============================================================================
+# Ce modèle ne contient AUCUNE adresse de serveur applicatif (énoncé §4).
+# scripts/lb.sh remplace les marqueurs @@…@@ à partir de config/noeuds.yml,
+# la même source de vérité que le Vagrantfile, puis écrit le résultat dans
+# /etc/haproxy/haproxy.cfg. NB_APP=4 vagrant up suffit donc à ajouter app3 et app4.
+# =============================================================================
+
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    # Interface d'administration locale : état des serveurs, drainage (étape 7).
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    # Serveur qui refuse la connexion, ne répond rien ou dépasse le délai :
+    # la requête (une simple lecture) est rejouée sur un AUTRE serveur.
+    option  redispatch 1
+    retries 2
+    retry-on conn-failure empty-response response-timeout
+    timeout connect 1s
+    timeout client  30s
+    timeout server  5s
+    # Sonde : connexion en 1 s au plus (serveur éteint écarté vite, R4), puis 3 s
+    # pour répondre. 3 s > 2 s, le délai de connexion de l'application à CHAQUE
+    # base : pendant une bascule (étape 5), la première sonde d'un serveur sain
+    # dure ~2 s (base éteinte essayée en premier) et ne doit pas compter en échec.
+    timeout check   3s
+    # Réponses émises par HAProxy lui-même : du JSON, jamais une page blanche (V4).
+    # (200 : réponse de /lb-sante, la page de vie du répartiteur, étape 6.)
+    errorfile 200 /etc/haproxy/errors/resultats-200.http
+    errorfile 502 /etc/haproxy/errors/resultats-502.http
+    errorfile 503 /etc/haproxy/errors/resultats-503.http
+    errorfile 504 /etc/haproxy/errors/resultats-504.http
+
+frontend fe_resultats
+    # Toutes les adresses de la machine, port 80 : l'adresse privée, et l'IP
+    # virtuelle quand keepalived la porte (extension E1).
+    bind :80
+    # Réponse 200 d'HAProxy lui-même, sans serveur applicatif : c'est ce que
+    # vérifie keepalived (extension E1) pour savoir si ce répartiteur vit.
+    monitor-uri /lb-sante
+    default_backend be_app
+
+backend be_app
+    balance roundrobin
+    # Sonde active (R4) : GET /sante chaque seconde sur chaque serveur.
+    # 2 échecs de suite : serveur écarté ; 2 succès de suite : serveur réintégré.
+    option httpchk
+    http-check send meth GET uri /sante ver HTTP/1.1 hdr Host resultats-bf
+    http-check expect status 200
+    default-server inter 1s fall 2 rise 2
+@@SERVEURS_APP@@
+
+listen statistiques
+    # Page d'état, sur le réseau privé seulement : aucun port redirigé (R8).
+    bind @@IP_PRIVEE@@:8404
+    stats enable
+    stats uri /stats
+    stats refresh 2s
+    stats show-legends
+    stats auth admin:@@MDP_STATS@@
