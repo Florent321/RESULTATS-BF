@@ -1,0 +1,71 @@
+Socle RÉSULTATS-BF : 2026-10-24 18:14:21, commit e9c7c51, NB_APP=2 (défaut)
+
+== 1. Machines démarrées (d'après Vagrant) ==
+OK     6 machines démarrées : bdd1 bdd2 app1 app2 lb1 lb2
+
+== 2. Noms et réseau privé, vus de chaque machine ==
+OK     bdd1 -> bdd2 (192.168.69.32)
+OK     bdd1 -> app1 (192.168.69.21)
+OK     bdd1 -> app2 (192.168.69.22)
+OK     bdd1 -> lb1 (192.168.69.11)
+OK     bdd1 -> lb2 (192.168.69.12)
+OK     bdd1 : un seul bloc RESULTATS-BF dans /etc/hosts
+OK     bdd2 -> bdd1 (192.168.69.31)
+OK     bdd2 -> app1 (192.168.69.21)
+OK     bdd2 -> app2 (192.168.69.22)
+OK     bdd2 -> lb1 (192.168.69.11)
+OK     bdd2 -> lb2 (192.168.69.12)
+OK     bdd2 : un seul bloc RESULTATS-BF dans /etc/hosts
+OK     app1 -> bdd1 (192.168.69.31)
+OK     app1 -> bdd2 (192.168.69.32)
+OK     app1 -> app2 (192.168.69.22)
+OK     app1 -> lb1 (192.168.69.11)
+OK     app1 -> lb2 (192.168.69.12)
+OK     app1 : un seul bloc RESULTATS-BF dans /etc/hosts
+OK     app2 -> bdd1 (192.168.69.31)
+OK     app2 -> bdd2 (192.168.69.32)
+OK     app2 -> app1 (192.168.69.21)
+OK     app2 -> lb1 (192.168.69.11)
+OK     app2 -> lb2 (192.168.69.12)
+OK     app2 : un seul bloc RESULTATS-BF dans /etc/hosts
+OK     lb1 -> bdd1 (192.168.69.31)
+OK     lb1 -> bdd2 (192.168.69.32)
+OK     lb1 -> app1 (192.168.69.21)
+OK     lb1 -> app2 (192.168.69.22)
+OK     lb1 -> lb2 (192.168.69.12)
+OK     lb1 : un seul bloc RESULTATS-BF dans /etc/hosts
+OK     lb2 -> bdd1 (192.168.69.31)
+OK     lb2 -> bdd2 (192.168.69.32)
+OK     lb2 -> app1 (192.168.69.21)
+OK     lb2 -> app2 (192.168.69.22)
+OK     lb2 -> lb1 (192.168.69.11)
+OK     lb2 : un seul bloc RESULTATS-BF dans /etc/hosts
+
+== 3. Idempotence (R2) : deux provisionnements de suite ==
+OK     passe 1 : réussie, aucune modification ni action
+OK     passe 2 : réussie, aucune modification ni action
+
+== 4. Empreinte de /etc/hosts inchangée après les deux passes ==
+OK     bdd1 : e84aa030fdd3d789
+OK     bdd2 : 7a0b272fed8f949e
+OK     app1 : d66530b6d9e5fca4
+OK     app2 : 229bf24a8a765b35
+OK     lb1 : 8a64c50504761e83
+OK     lb2 : 7db88d5ddd1079a5
+
+== 5. Paramètres NB_APP, GROUPE et E1 (R3) et garde-fous ==
+ATTENTION  réseau 192.168.69.0/24 hors de la plage de l'énoncé (192.168.56.0/21) : accepté par VirtualBox sous Windows seulement ; à faire valider par l'enseignant
+OK     NB_APP=12 refusé (au-delà de 9 : collision d'adresses avec bdd1)
+OK     GROUPE=21 refusé (groupes 1 à 20)
+OK     noeuds.yml suit NB_APP : 4 serveurs avec NB_APP=4, 2 par défaut
+OK     E1=2 refusé (0 ou 1)
+OK     noeuds.yml suit E1 : lb2 et IP virtuelle par défaut, ni l'un ni l'autre avec E1=0
+
+== 6. Exposition (R8) et secrets (R7) ==
+OK     un seul forwarded_port dans le Vagrantfile
+OK     .env est ignoré par Git
+OK     .env n'apparaît dans aucun commit
+OK     aucune valeur de .env dans l'historique Git
+
+== Bilan ==
+ÉTAPE 1 VALIDÉE : aucun échec.
