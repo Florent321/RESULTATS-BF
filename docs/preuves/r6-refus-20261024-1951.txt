@@ -1,0 +1,7 @@
+
+== 1. Diagnostic ==
+date : 2026-10-24 19:51:31 ; commit : afaef03
+bdd1 : VM running, PostgreSQL primaire
+bdd2 : VM running, PostgreSQL replique (flux : streaming, reçu : 0/40212A8, rejoué : 0/40212A8)
+vu depuis bdd2, bdd1 (192.168.69.31) est : primaire
+ERREUR : bdd1 est primaire et répond encore : bascule refusée (deux primaires divergeraient). Bascule planifiée : bash scripts/bascule.sh bdd2 --forcer
