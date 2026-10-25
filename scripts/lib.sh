@@ -203,34 +203,6 @@ attendre_port() {
   log "$hote:$port joignable."
 }
 
-# --- Interface d'administration de HAProxy (répartiteurs seulement) ------------------
-SOCKET_HAPROXY=/run/haproxy/admin.sock
-
-# api_haproxy COMMANDE : envoie une commande à HAProxy par son socket local
-# (« show stat », « set server be_app/app1 state drain »…) et affiche la réponse.
-api_haproxy() {
-  python3 - "$SOCKET_HAPROXY" "$1" <<'PY'
-import socket
-import sys
-
-with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-    s.settimeout(5)
-    s.connect(sys.argv[1])
-    s.sendall((sys.argv[2] + "\n").encode())
-    morceaux = []
-    while morceau := s.recv(65536):
-        morceaux.append(morceau)
-sys.stdout.write(b"".join(morceaux).decode())
-PY
-}
-
-# etat_serveurs_haproxy : « serveur état sessions_en_cours » pour chaque serveur de be_app.
-etat_serveurs_haproxy() {
-  api_haproxy "show stat" | awk -F, '
-    NR == 1 { for (i = 1; i <= NF; i++) { c = $i; sub(/^# /, "", c); col[c] = i }; next }
-    $1 == "be_app" && $2 != "BACKEND" && $2 != "FRONTEND" { print $2, $(col["status"]), $(col["scur"]) }'
-}
-
 # code_http URL : code de réponse HTTP (000 si aucune réponse en 5 s).
 code_http() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$1" || true; }
 

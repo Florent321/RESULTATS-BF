@@ -1,0 +1,31 @@
+
+== Déploiement de la version 1.1.0 sur 2 serveur(s), un par un ==
+date : 2026-10-25 00:04:39 ; commit : cb4281b ; répartiteurs : lb1 lb2
+
+== app1 (192.168.69.21) ==
+[lb1] ACTION app1 retiré (drain) : 0 requête en cours, état DRAIN
+[lb2] ACTION app1 retiré (drain) : 0 requête en cours, état DRAIN
+[app1] MODIF  /etc/resultats-bf/app.env
+[app1] ACTION systemctl restart resultats
+[app1] service resultats : version 1.1.0, port 3000
+[app1] base joignable : /sante répond 200
+[lb1] ACTION app1 remis en service : UP en 0 s
+[lb2] ACTION app1 remis en service : UP en 0 s
+OK     app1 : 1.0.0 → 1.1.0 en 28.9 s
+
+== app2 (192.168.69.22) ==
+[lb1] ACTION app2 retiré (drain) : 0 requête en cours, état DRAIN
+[lb2] ACTION app2 retiré (drain) : 0 requête en cours, état DRAIN
+[app2] MODIF  /etc/resultats-bf/app.env
+[app2] ACTION systemctl restart resultats
+[app2] service resultats : version 1.1.0, port 3000
+[app2] base joignable : /sante répond 200
+[lb1] ACTION app2 remis en service : UP en 0 s
+[lb2] ACTION app2 remis en service : UP en 0 s
+OK     app2 : 1.0.0 → 1.1.0 en 21.1 s
+
+== Bilan du déploiement ==
+2 serveur(s) mis à jour en 50.9 s
+
+== Bilan ==
+Déploiement de 1.1.0 : VALIDÉ (aucun échec).

@@ -52,8 +52,8 @@ Pour ajouter des serveurs, changez `NB_APP` : ne démarrez jamais `app5` à la m
 
 | Machine | Adresse | Rôle |
 | --- | --- | --- |
-| bdd1 | 192.168.X.31 | PostgreSQL primaire (rôle nominal) |
-| bdd2 | 192.168.X.32 | Réplique en flux ; primaire après une bascule |
+| bdd1 | 192.168.X.31 | PostgreSQL primaire |
+| bdd2 | 192.168.X.32 | Réplique en flux |
 | app1 … appN | 192.168.X.21 … .2N | Serveurs applicatifs sans état |
 | lb1 | 192.168.X.11 | Répartiteur HAProxy |
 
@@ -90,32 +90,6 @@ puis alimentée en continu, en lecture seule. Les données vivent dans
 | `replicateur` | réplication entre bdd1 et bdd2 | `PG_REPLICATION_MDP` |
 
 Consulter la base : `vagrant ssh bdd1 -c "sudo -u postgres psql -d resultats"`.
-
-### Bascule de la base (R6)
-
-Quand la primaire est perdue (`vagrant halt bdd1`, panne…), le service répond
-503 en JSON sur `/sante` et `/resultat`. La procédure, chronométrée :
-
-```bash
-bash scripts/bascule.sh          # promeut la réplique démarrée (bdd2)
-bash scripts/reintegrer.sh bdd1  # plus tard : bdd1 redevient réplique (destructif pour bdd1)
-```
-
-`bascule.sh` refuse d'agir si l'ancienne primaire répond encore : deux
-primaires recevraient chacune leurs écritures et divergeraient. Avant la
-promotion, il **isole** l'ancienne primaire : témoin `.etat/isole-bdd1` (non
-versionné) et arrêt de PostgreSQL si la VM tourne. Rallumée, elle garde
-PostgreSQL arrêté jusqu'à `reintegrer.sh`. Les serveurs applicatifs ne sont
-pas touchés. Les durées vont dans `mesures/bascules.csv`.
-
-Bascule planifiée (retour à bdd1 primaire, par exemple) :
-`bash scripts/bascule.sh bdd1 --forcer` puis `bash scripts/reintegrer.sh bdd2`.
-
-PostgreSQL ne démarre plus seul au démarrage d'une VM (`start.conf` à `manual`) :
-c'est le provisionnement qui le lance, après avoir vérifié que le nœud n'est
-ni isolé ni en concurrence avec une autre primaire. Après un redémarrage hors
-Vagrant (interface de VirtualBox, `sudo reboot`), relancez-le avec
-`vagrant provision bdd1` (ou `vagrant up`).
 
 ## Application
 
@@ -157,8 +131,6 @@ scripts/commun.sh    provisionnement commun à toutes les machines
 scripts/lib_pg.sh    fonctions PostgreSQL (bdd.sh, replique.sh)
 scripts/lib_hote.sh  fonctions des scripts lancés sur l'hôte (tests/)
 scripts/<rôle>.sh    bdd, replique, app, lb
-scripts/bascule.sh   bascule de la base (hôte) ; reintegrer.sh : retour en réplique
-scripts/pg_outil.sh  état, arrêt, promotion de PostgreSQL (dans une VM de base)
 app/                 application, version, unité systemd
 sql/                 schéma et données (idempotents)
 config/              modèle HAProxy, numéro de groupe (noeuds.yml est engendré)
