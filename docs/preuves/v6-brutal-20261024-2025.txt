@@ -1,0 +1,23 @@
+
+== V6 — panne du répartiteur maître ==
+date : 2026-10-24 20:25:41 ; commit : 88e2ba2 ; IP virtuelle : 192.168.69.5
+l'IP virtuelle est portée par lb2 ; lb1 est en attente
+sonde : bash tests/sonde.sh "http://192.168.69.5/resultat?matricule=BF-2026-000042" (toutes les 0,1 s)
+panne : vagrant halt --force lb2, terminé en 18.0 s
+OK     l'IP virtuelle 192.168.69.5 est maintenant portée par lb1
+
+== Retour de lb2 (nopreempt : il ne doit pas reprendre l'IP) ==
+OK     lb1 garde l'IP virtuelle ; lb2 est revenu en attente
+
+== Sonde pendant la panne ==
+requêtes touchées (erreur ou plus de 0,5 s) : 1, dont en erreur : 0 ; la plus lente : 3.06 s
+coupure vue par la sonde : 3.1 s ; service normal 19.6 s après le début de l'arrêt
+ECHEC  service perturbé pendant 19.6 s (plus de 5 s)
+
+== Sonde pendant le retour de lb2 ==
+requêtes touchées : 0, dont en erreur : 0 ; la plus lente : 0.20 s
+OK     aucune erreur au retour de lb2
+sorties brutes : mesures/v6-20261024-202541/ (sonde.csv) ; ligne ajoutée à mesures/v6.csv
+
+== Bilan ==
+V6 : NON VALIDÉ (1 échec(s)).
