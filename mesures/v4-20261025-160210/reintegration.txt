@@ -1,0 +1,57 @@
+
+== 1. Primaire actuelle ==
+primaire actuelle : bdd1 ; à réintégrer : bdd2
+
+== 2. Confirmation ==
+ATTENTION — opération DESTRUCTIVE pour bdd2 : ses données PostgreSQL seront
+remplacées par une copie de bdd1 (les anciennes restent dans la VM, dossier
+/var/lib/postgresql/16/main.avant-reintegration-DATE).
+
+== 3. Recopie depuis bdd1 ==
+Bringing machine 'bdd2' up with 'virtualbox' provider...
+==> bdd2: Clearing any previously set forwarded ports...
+==> bdd2: Fixed port collision for 22 => 2222. Now on port 2200.
+==> bdd2: Clearing any previously set network interfaces...
+==> bdd2: Preparing network interfaces based on configuration...
+    bdd2: Adapter 1: nat
+    bdd2: Adapter 2: hostonly
+==> bdd2: Forwarding ports...
+    bdd2: 22 (guest) => 2200 (host) (adapter 1)
+==> bdd2: Running 'pre-boot' VM customizations...
+==> bdd2: Booting VM...
+==> bdd2: Waiting for machine to boot. This may take a few minutes...
+    bdd2: SSH address: 127.0.0.1:2200
+    bdd2: SSH username: vagrant
+    bdd2: SSH auth method: private key
+==> bdd2: Machine booted and ready!
+==> bdd2: Checking for guest additions in VM...
+==> bdd2: Setting hostname...
+==> bdd2: Configuring and enabling network interfaces...
+==> bdd2: Mounting shared folders...
+    bdd2: C:/projets/RESULTATS-BF => /vagrant
+==> bdd2: Machine already provisioned. Run `vagrant provision` or use the `--provision`
+==> bdd2: flag to force provisioning. Provisioners marked to run always will still run.
+==> bdd2: Running provisioner: commun (shell)...
+    bdd2: Running: C:/Users/DONALD/AppData/Local/Temp/vagrant-shell20261025-12476-icahnp.sh
+    bdd2: [bdd2] paquets déjà présents : python3-yaml curl postgresql
+    bdd2: [bdd2] machine déclarée : bdd2 (replique)
+    bdd2: [bdd2] socle commun prêt (rôle replique).
+==> bdd2: Running provisioner: role (shell)...
+    bdd2: Running: C:/Users/DONALD/AppData/Local/Temp/vagrant-shell20261025-12476-p9o19i.sh
+    bdd2: [bdd2] ISOLÉ : bdd2 a été remplacée par une bascule ; PostgreSQL reste arrêté.
+    bdd2: [bdd2]         Pour la réintégrer comme réplique, depuis l'hôte : bash scripts/reintegrer.sh bdd2
+[bdd2] 192.168.69.31:5432 joignable.
+[bdd2] clonage du primaire 192.168.69.31 vers bdd2 (pg_basebackup)…
+[bdd2] ACTION mv /var/lib/postgresql/16/main /var/lib/postgresql/16/main.avant-reintegration-20261025-160435
+[bdd2] ACTION runuser -u postgres -- pg_basebackup -w -D /var/lib/postgresql/16/main -d host=192.168.69.31 port=5432 user=replicateur application_name=bdd2 --wal-method=stream --checkpoint=fast --write-recovery-conf --slot=slot_bdd2
+[bdd2] ACTION systemctl start postgresql@16-main
+[bdd2] réplique : flux streaming depuis 192.168.69.31
+OK     isolement de bdd2 levé
+
+== 4. Vérification ==
+OK     bdd2 est réplique
+OK     bdd1 envoie son journal à bdd2 (streaming)
+durée de la réintégration : 80.0 s (confirmation comprise)
+
+== Bilan ==
+Réintégration de bdd2 : VALIDÉ (aucun échec).

@@ -1,0 +1,5 @@
+date;commit;operation;machine;autre;mode;diagnostic_s;isolement_s;promotion_s;reprise_s;total_s
+2026-10-25 15:54:55;4f3db63;bascule;bdd2;bdd1;panne;29.0;0.2;1.7;4.7;35.7
+2026-10-25 16:00:07;4f3db63;reintegration;bdd1;bdd2;-;;;;;71.5
+2026-10-25 16:03:15;4f3db63;bascule;bdd1;bdd2;panne;28.7;0.2;1.3;2.0;32.2
+2026-10-25 16:04:46;4f3db63;reintegration;bdd2;bdd1;-;;;;;80.0

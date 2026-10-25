@@ -36,9 +36,7 @@ defaults
     # base : pendant une bascule (étape 5), la première sonde d'un serveur sain
     # dure ~2 s (base éteinte essayée en premier) et ne doit pas compter en échec.
     timeout check   3s
-    # Réponses émises par HAProxy lui-même : du JSON, jamais une page blanche (V4).
-    # (200 : réponse de /lb-sante, la page de vie du répartiteur, étape 6.)
-    errorfile 200 /etc/haproxy/errors/resultats-200.http
+    # Erreurs émises par HAProxy lui-même : du JSON, jamais une page blanche (V4).
     errorfile 502 /etc/haproxy/errors/resultats-502.http
     errorfile 503 /etc/haproxy/errors/resultats-503.http
     errorfile 504 /etc/haproxy/errors/resultats-504.http
@@ -47,9 +45,6 @@ frontend fe_resultats
     # Toutes les adresses de la machine, port 80 : l'adresse privée, et l'IP
     # virtuelle quand keepalived la porte (extension E1).
     bind :80
-    # Réponse 200 d'HAProxy lui-même, sans serveur applicatif : c'est ce que
-    # vérifie keepalived (extension E1) pour savoir si ce répartiteur vit.
-    monitor-uri /lb-sante
     default_backend be_app
 
 backend be_app

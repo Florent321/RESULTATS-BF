@@ -182,6 +182,22 @@ Vagrant.configure("2") do |config|
         vb.memory = n["mem"]
       end
 
+      if %w[bdd replique].include?(n["role"])
+        # Étape 5 : une base DÉTRUITE repartira de zéro ; son témoin d'isolement
+        # (.etat/isole-NOM, posé par scripts/bascule.sh) n'a plus d'objet.
+        # Le déclencheur s'exécute même si l'on répond « non » à vagrant destroy :
+        # on ne retire donc le témoin que si la VM n'existe vraiment plus.
+        m.trigger.after :destroy do |t|
+          t.ruby do |_env, machine|
+            temoin = File.join(RACINE, ".etat", "isole-#{n['nom']}")
+            if machine.state.id == :not_created && File.exist?(temoin)
+              FileUtils.rm_f(temoin)
+              puts "==> #{n['nom']}: témoin d'isolement retiré (la base repartira de zéro)."
+            end
+          end
+        end
+      end
+
       # Les deux provisionneurs sont rejoués à CHAQUE vagrant up (run: "always") :
       # les configurations engendrées (pg_hba.conf, HAProxy…) suivent ainsi
       # NB_APP sans geste manuel. Contrepartie : tout doit être idempotent (R2).
