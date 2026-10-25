@@ -69,6 +69,12 @@ X = 55 + numéro de groupe. Seul lb1 expose un port vers l'hôte : `localhost:80
 | `vagrant destroy -f` | **Supprime toutes les machines et leurs données** |
 | `bash tests/verifier_socle.sh` | Vérifie le socle (noms, réseau, idempotence, paramètres, secrets) |
 | `bash tests/r5_replication.sh` | Preuve de R5 : écriture sur le primaire, lecture sur la réplique |
+| `bash tests/verifier_plateforme.sh` | Contrôle de bout en bout : service, JSON, serveurs UP, configuration engendrée |
+| `bash tests/v1_repartition.sh` | Scénario V1 : 20 appels à `/info`, écart de répartition |
+| `bash tests/v2_panne_app.sh app1 [--brutal]` | Scénario V2 : panne d'un serveur pendant une charge `ab` |
+| `bash tests/v4_bascule_bdd.sh [--brutal] [--reintegrer]` | Scénario V4 : panne de la base primaire, bascule chronométrée |
+| `bash scripts/bascule.sh [--forcer]` | **Bascule de la base** : promeut la réplique (voir ci-dessous) |
+| `bash scripts/reintegrer.sh bdd1` | **Destructif pour bdd1** : la recopie depuis la primaire actuelle et en fait une réplique |
 
 ## Base de données
 
@@ -101,6 +107,21 @@ L'application essaie `bdd1` puis `bdd2` et n'accepte que la base qui accepte
 les écritures : après une bascule, elle suit la nouvelle primaire sans
 reconfiguration. Journal du service : `vagrant ssh app1 -c "journalctl -u resultats -n 30"`.
 
+## Répartiteur
+
+HAProxy sur lb1, port 80. Sa configuration est **engendrée** par `scripts/lb.sh`
+à partir de `config/haproxy.cfg.modele` (qui ne contient aucune adresse) et
+de la liste des serveurs de `config/noeuds.yml` : `NB_APP=4 vagrant up` suffit
+pour ajouter app3 et app4. Chaque serveur est sondé sur `GET /sante` chaque
+seconde ; deux échecs l'écartent, deux succès le réintègrent. Une requête
+envoyée à un serveur qui tombe est rejouée sur un autre.
+
+| Adresse, depuis l'hôte | Usage |
+| --- | --- |
+| `http://192.168.X.11/` | Service, par le réseau privé (à utiliser pour mesurer) |
+| `http://127.0.0.1:8080/` | Service, par la redirection de port de VirtualBox |
+| `http://192.168.X.11:8404/stats` | Page d'état de HAProxy (utilisateur `admin`, mot de passe `HAPROXY_STATS_MDP` de `.env`) |
+
 ## Structure du dépôt
 
 ```text
@@ -112,7 +133,7 @@ scripts/lib_hote.sh  fonctions des scripts lancés sur l'hôte (tests/)
 scripts/<rôle>.sh    bdd, replique, app, lb
 app/                 application, version, unité systemd
 sql/                 schéma et données (idempotents)
-config/              fichiers de configuration (noeuds.yml est engendré)
+config/              modèle HAProxy, numéro de groupe (noeuds.yml est engendré)
 tests/               vérifications et scénarios V1 à V6
 mesures/             sorties brutes des mesures
 docs/                dossier d'architecture, journal de bord, preuves
@@ -123,5 +144,6 @@ docs/                dossier d'architecture, journal de bord, preuves
 - [x] Étape 1 : socle Vagrant (machines, inventaire engendré, provisionnement commun)
 - [x] Étape 2 : PostgreSQL, données et réplication
 - [x] Étape 3 : application
-- [ ] Étape 4 : HAProxy et sonde de santé
-- [ ] Étapes suivantes : bascule, extensions E1 et E4, mesures
+- [x] Étape 4 : HAProxy et sonde de santé
+- [x] Étape 5 : bascule de la base, isolement et réintégration
+- [ ] Étapes suivantes : extensions E1 et E4, mesures

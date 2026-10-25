@@ -82,7 +82,7 @@ paquets_du_role() {
   case $1 in
     bdd | replique) supplementaires="postgresql" ;;   # étape 2 : PostgreSQL 16
     app)            supplementaires="python3-flask python3-psycopg python3-gunicorn" ;;   # étape 3
-    lb)             supplementaires="" ;;   # étape 4 : haproxy
+    lb)             supplementaires="haproxy" ;;   # étape 4
     *) erreur "rôle inconnu : $1 (attendu : bdd, replique, app ou lb)" ;;
   esac
   echo "${PAQUETS_BASE[*]} $supplementaires"
