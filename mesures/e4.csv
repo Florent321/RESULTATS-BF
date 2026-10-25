@@ -1,0 +1,2 @@
+date;commit;version;serveurs;duree_deploiement_s;requetes_ab;echecs_ab;non2xx_ab;erreurs_sonde;debit
+2026-10-25 00:06:05;cb4281b;1.1.0;2;52.3;4484;0;0;0;49.81
