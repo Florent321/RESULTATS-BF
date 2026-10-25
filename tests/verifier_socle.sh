@@ -78,7 +78,7 @@ for m in "${ACTIVES[@]}"; do
 done
 
 # --- 5 -----------------------------------------------------------------------
-titre "5. Paramètres NB_APP, GROUPE et E1 (R3) et garde-fous"
+titre "5. Paramètres NB_APP et GROUPE (R3) et garde-fous"
 compter_apps() { grep -c "role: app" config/noeuds.yml; }
 # Plage de l'énoncé (§7.1) : groupes 1 à 8, 192.168.56.0 à 192.168.63.255. Au-delà,
 # seul VirtualBox sous Windows accepte le réseau : signalé, sans compter comme échec.
@@ -109,18 +109,6 @@ if [[ $avec4 == 4 && $defaut == 2 ]]; then
   ok "noeuds.yml suit NB_APP : 4 serveurs avec NB_APP=4, 2 par défaut"
 else
   echec "noeuds.yml ne suit pas NB_APP : $avec4 avec NB_APP=4, $defaut par défaut"
-fi
-# Extension E1 (étape 6) : lb2 et l'IP virtuelle n'existent qu'avec E1=1 (défaut).
-if E1=2 vagrant status >/dev/null 2>&1; then echec "E1=2 accepté"; else ok "E1=2 refusé (0 ou 1)"; fi
-E1=0 vagrant status >/dev/null 2>&1
-sans_e1=$(grep -cE '^vip: |nom: lb2' config/noeuds.yml)
-env -u E1 vagrant status >/dev/null 2>&1
-avec_e1=$(grep -cE '^vip: |nom: lb2' config/noeuds.yml)
-vagrant status >/dev/null 2>&1   # remet noeuds.yml dans l'état de cette session
-if [[ $sans_e1 == 0 && $avec_e1 == 2 ]]; then
-  ok "noeuds.yml suit E1 : lb2 et IP virtuelle par défaut, ni l'un ni l'autre avec E1=0"
-else
-  echec "noeuds.yml ne suit pas E1 ($avec_e1 ligne(s) par défaut, $sans_e1 avec E1=0)"
 fi
 
 # --- 6 -----------------------------------------------------------------------

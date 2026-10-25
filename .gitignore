@@ -10,5 +10,3 @@ config/noeuds.yml
 # Caches Python
 __pycache__/
 *.pyc
-# Témoins d'isolement des bases (scripts/bascule.sh) : état local du poste
-.etat/

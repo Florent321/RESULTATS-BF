@@ -5,10 +5,6 @@
 -- Exécuté par scripts/lib_pg.sh, sur le primaire seulement.
 -- =============================================================================
 
--- Taire les avis « already exists, skipping » des rejeux : seules les vraies
--- erreurs restent dans le journal du provisionnement.
-SET client_min_messages = warning;
-
 CREATE TABLE IF NOT EXISTS resultats (
     matricule text          PRIMARY KEY,
     nom       text          NOT NULL,
