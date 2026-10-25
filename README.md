@@ -79,6 +79,11 @@ X = 55 + numéro de groupe. Seul lb1 expose un port vers l'hôte : `localhost:80
 | `bash tests/v2_panne_app.sh app1 [--brutal]` | Scénario V2 : panne d'un serveur pendant une charge `ab` |
 | `bash tests/v4_bascule_bdd.sh [--brutal] [--reintegrer]` | Scénario V4 : panne de la base primaire, bascule chronométrée |
 | `bash tests/v6_bascule_lb.sh [--brutal]` | Scénario V6 (E1) : panne du répartiteur qui porte l'IP virtuelle |
+| `bash tests/v3_charge.sh` | Scénario V3 : débit avec la configuration actuelle (voir « Campagne de mesures ») |
+| `bash tests/v5_reconstruction.sh` | Scénario V5 : **détruit tout**, reconstruit, vérifie, chronomètre |
+| `bash tests/synthese.sh` | Tableaux de toutes les mesures, dans `mesures/synthese.md` |
+| `bash scripts/deploiement.sh` | Extension E4 : installe la version du dépôt serveur par serveur, sans coupure |
+| `bash tests/e4_deploiement.sh --version 1.1.0` | E4 sous charge : modifie `app/VERSION`, déploie, compte les erreurs |
 | `bash scripts/bascule.sh [--forcer]` | **Bascule de la base** : promeut la réplique (voir ci-dessous) |
 | `bash scripts/reintegrer.sh bdd1` | **Destructif pour bdd1** : la recopie depuis la primaire actuelle et en fait une réplique |
 
@@ -165,6 +170,42 @@ configuration keepalived est engendrée, comme celle d'HAProxy, depuis
 | `http://127.0.0.1:8080/` | Service, par la redirection de port de VirtualBox |
 | `http://192.168.X.11:8404/stats` | Page d'état de HAProxy (utilisateur `admin`, mot de passe `HAPROXY_STATS_MDP` de `.env`) |
 
+## Mise à jour de l'application sans coupure (extension E4)
+
+1. Modifiez `app/app.py` si besoin et augmentez le numéro de `app/VERSION`.
+2. Lancez `bash scripts/deploiement.sh`.
+
+Pour chaque serveur, l'un après l'autre, le script le retire des répartiteurs
+(état `drain` d'HAProxy : plus de nouvelles requêtes), attend la fin des
+requêtes en cours, installe la nouvelle version (`scripts/app.sh`), vérifie
+`/info` et `/sante`, puis le remet en service. Un seul serveur est hors service
+à la fois. `vagrant provision` installerait aussi la nouvelle version, mais
+sans retirer les serveurs d'abord : réservez-le à la configuration.
+
+Commandes manuelles, dans un répartiteur :
+`sudo bash /vagrant/scripts/haproxy_serveur.sh etat|drainer app1|activer app1`.
+
+## Campagne de mesures (scénarios V1 à V6)
+
+Chaque scénario écrit ses sorties brutes dans `mesures/<scénario>-<date>/` et
+une ligne dans `mesures/<scénario>.csv` (date, commit, valeurs mesurées) :
+commitez-les, ce sont les preuves du dossier.
+
+| Scénario | Commande (Git Bash, à la racine) |
+| --- | --- |
+| V1 Répartition | `bash tests/v1_repartition.sh` |
+| V2 Panne d'un serveur applicatif | `bash tests/v2_panne_app.sh app1` (ajoutez `--brutal` pour une coupure de courant) |
+| V3 Montée en charge | `bash tests/v3_charge.sh`, puis `NB_APP=4 vagrant up` et `NB_APP=4 bash tests/v3_charge.sh` |
+| V4 Panne de la base primaire | `bash tests/v4_bascule_bdd.sh --reintegrer` |
+| V5 Reconstruction | `bash tests/v5_reconstruction.sh` (destructif) |
+| V6 Panne du répartiteur (E1) | `bash tests/v6_bascule_lb.sh` |
+| E4 Déploiement sans coupure | `bash tests/e4_deploiement.sh --version 1.1.0` |
+
+Ensuite, `bash tests/synthese.sh` rassemble les dernières mesures en tableaux.
+Pour V3, revenez ensuite à deux serveurs : `vagrant destroy -f app3 app4`, puis
+`vagrant up`. Mesurez par l'adresse privée du service (IP virtuelle), pas par
+`localhost:8080` dont la redirection passe par le NAT de VirtualBox.
+
 ## Structure du dépôt
 
 ```text
@@ -176,6 +217,7 @@ scripts/lib_hote.sh  fonctions des scripts lancés sur l'hôte (tests/)
 scripts/<rôle>.sh    bdd, replique, app, lb
 scripts/bascule.sh   bascule de la base (hôte) ; reintegrer.sh : retour en réplique
 scripts/pg_outil.sh  état, arrêt, promotion de PostgreSQL (dans une VM de base)
+scripts/deploiement.sh  mise à jour serveur par serveur (hôte) ; haproxy_serveur.sh : drain
 app/                 application, version, unité systemd
 sql/                 schéma et données (idempotents)
 config/              modèles HAProxy et keepalived, numéro de groupe (noeuds.yml est engendré)
@@ -192,4 +234,6 @@ docs/                dossier d'architecture, journal de bord, preuves
 - [x] Étape 4 : HAProxy et sonde de santé
 - [x] Étape 5 : bascule de la base, isolement et réintégration
 - [x] Étape 6 : extension E1 (lb2, keepalived, IP virtuelle)
-- [ ] Étapes suivantes : extension E4, mesures
+- [x] Étape 7 : extension E4 (déploiement sans coupure)
+- [x] Étape 8 : outils de mesure V1 à V6 et synthèse
+- [ ] Campagne de mesures sur les postes du groupe, dossier, journal de bord, soutenance

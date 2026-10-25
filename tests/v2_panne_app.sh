@@ -74,7 +74,16 @@ info "sorties brutes : $dossier/ (ab.txt, sonde.csv) ; ligne ajoutée à mesures
 if (( retour )); then
   etape "Remise en service de $cible"
   if vagrant up "$cible" >"$dossier/remise.txt" 2>&1; then
-    ok "$cible rallumée"
+    # Le répartiteur ne le sert de nouveau qu'après deux sondes réussies (rise 2).
+    revu=0
+    for _ in $(seq 30); do
+      # Réponses gardées dans une variable : avec pipefail, « … | grep -q » échouerait
+      # à tort dès que grep s'arrête avant la fin de la boucle (SIGPIPE).
+      reponses=$(for _ in 1 2 3 4 5 6; do curl -s --max-time 2 "$(url_service)/info"; echo; done)
+      if grep -q "\"serveur\":\"$cible\"" <<<"$reponses"; then revu=1; break; fi
+      sleep 1
+    done
+    if (( revu )); then ok "$cible rallumée et de nouveau servie par le répartiteur"; else ko "$cible rallumée, mais pas servie après 30 s (voir $dossier/remise.txt)"; fi
   else
     ko "$cible ne redémarre pas (voir $dossier/remise.txt)"
   fi

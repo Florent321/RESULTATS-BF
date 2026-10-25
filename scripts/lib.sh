@@ -234,10 +234,13 @@ PY
 }
 
 # etat_serveurs_haproxy : « serveur état sessions_en_cours » pour chaque serveur de be_app.
+# États : UP, DOWN, DRAIN (retiré à la main), ou transitoires comme UP_1/2
+# (les espaces sont remplacés par « _ » pour garder trois champs).
 etat_serveurs_haproxy() {
   api_haproxy "show stat" | awk -F, '
     NR == 1 { for (i = 1; i <= NF; i++) { c = $i; sub(/^# /, "", c); col[c] = i }; next }
-    $1 == "be_app" && $2 != "BACKEND" && $2 != "FRONTEND" { print $2, $(col["status"]), $(col["scur"]) }'
+    $1 == "be_app" && $2 != "BACKEND" && $2 != "FRONTEND" {
+      etat = $(col["status"]); gsub(/ /, "_", etat); print $2, etat, $(col["scur"]) }'
 }
 
 # code_http URL : code de réponse HTTP (000 si aucune réponse en 5 s).

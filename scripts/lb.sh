@@ -107,7 +107,7 @@ pairs=$(lister_noeuds lb | awk -v n="$NOM_MACHINE" '$1 != n { printf "        %s
 rang=$(lister_noeuds lb | awk -v n="$NOM_MACHINE" '$1 == n { print NR }')
 priorite=$(( rang == 1 ? 150 : 102 - rang ))
 # Interface qui porte l'adresse privée (eth1 sur la boîte bento, sans le supposer).
-interface=$(ip -o -4 addr show | awk -v ip="$IP_PRIVEE" '{ split($4, a, "/") } a[1] == ip { print $2; exit }')
+interface=$(ip -o -4 addr show | awk -v ip="$IP_PRIVEE" '{ split($4, a, "/") } a[1] == ip && !vu { print $2; vu = 1 }')
 [[ -n $interface ]] || erreur "aucune interface ne porte $IP_PRIVEE"
 # Identifiant VRRP : 3e octet du réseau (56 à 63), différent pour chaque groupe.
 vrid=$(cut -d. -f3 <<<"$VIP")
@@ -136,12 +136,17 @@ vrrp_modifie=$FICHIER_MODIFIE
 systemctl is-enabled --quiet keepalived || action systemctl enable --quiet keepalived
 if ! systemctl is-active --quiet keepalived; then
   action systemctl start keepalived
-  sleep 3   # élection : ~1,8 s sans annonce d'un maître avant de le devenir
 elif (( vrrp_modifie )); then
   # Rechargement (SIGHUP) : le maître garde l'IP, aucune coupure.
   action systemctl reload keepalived
 fi
-if ip -o -4 addr show dev "$interface" | grep -q " $VIP/"; then
+# Élection : un keepalived qui vient de démarrer (ici, ou au démarrage de la VM)
+# attend ~1,8 s les annonces d'un maître avant de prendre l'IP ; on lui laisse 4 s.
+age=$(ps -o etimes= -C keepalived 2>/dev/null | sort -n | awk 'NR == 1 { print $1 }') || true
+if [[ $age =~ ^[0-9]+$ ]] && (( age < 4 )); then sleep $(( 4 - age )); fi
+# (grep sur une variable, pas en fin de tube : avec pipefail, « … | grep -q »
+# peut échouer à tort quand grep s'arrête avant la fin de l'écriture.)
+if grep -q " $VIP/" <<<"$(ip -o -4 addr show dev "$interface")"; then
   log "keepalived : $NOM_MACHINE est MAÎTRE et porte l'IP virtuelle $VIP (priorité $priorite)"
 else
   log "keepalived : $NOM_MACHINE est en attente (BACKUP, priorité $priorite) ; l'IP virtuelle $VIP est portée par l'autre répartiteur"
