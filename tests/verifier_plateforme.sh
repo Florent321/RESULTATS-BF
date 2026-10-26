@@ -5,7 +5,7 @@
 # Vérifie que la plateforme entière répond : service par le répartiteur, JSON
 # attendu, serveurs vus UP par HAProxy, configuration engendrée (R3, R4),
 # réplication en flux (R5). C'est le contrôle du jalon J1, à relancer après
-# chaque vagrant up.
+# chaque vagrant up. Avec E1 : IP virtuelle portée par un seul répartiteur.
 # Usage : bash tests/verifier_plateforme.sh 2>&1 | tee "docs/preuves/plateforme-$(date +%Y%m%d-%H%M).txt"
 # =============================================================================
 set -u
@@ -14,6 +14,8 @@ source "$(dirname "$0")/../scripts/lib_hote.sh"
 
 base=$(url_service)
 mapfile -t apps < <(noeuds_hote app)
+# adresses_en_dur FICHIER : adresses IPv4 écrites dans un modèle, hors boucle locale.
+adresses_en_dur() { grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$1" | grep -vE '^(127\.0\.0\.1|0\.0\.0\.0)$'; }
 info "Plateforme RÉSULTATS-BF : $(horodatage), commit $(commit_courant), service $base, ${#apps[@]} serveur(s) applicatif(s)"
 
 etape "1. Le service répond par le répartiteur"
@@ -36,7 +38,7 @@ for ligne in "${apps[@]}"; do
 done
 
 etape "3. Répartiteur : configuration engendrée et sonde (R3, R4)"
-if grep -qE '([0-9]{1,3}\.){3}[0-9]{1,3}' config/haproxy.cfg.modele; then ko "le modèle contient une adresse IP écrite en dur"; else ok "le modèle ne contient aucune adresse IP"; fi
+if adresses_en_dur config/haproxy.cfg.modele >/dev/null; then ko "le modèle HAProxy contient une adresse écrite en dur : $(adresses_en_dur config/haproxy.cfg.modele | head -1)"; else ok "le modèle HAProxy ne contient aucune adresse IP"; fi
 for lb in $(noeuds_hote lb | awk '{ print $1 }'); do
   conf=$(vssh "$lb" "sudo grep -E '^ +server ' /etc/haproxy/haproxy.cfg")
   etats=$(vssh "$lb" "sudo bash -c 'source /vagrant/scripts/lib.sh; etat_serveurs_haproxy'")
@@ -61,5 +63,20 @@ fi
 etape "5. Redirection de port de l'hôte (R8)"
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:8080/info")
 if [[ $code == 200 ]]; then ok "http://127.0.0.1:8080/info : 200 (seul port redirigé, vers lb1)"; else info "ATTENTION : 127.0.0.1:8080 répond $code (port changé par auto_correct ? voir vagrant port lb1)"; fi
+
+vip=$(vip_hote)
+if [[ -n $vip ]]; then
+  etape "6. IP virtuelle des répartiteurs (extension E1)"
+  if adresses_en_dur config/keepalived.conf.modele >/dev/null; then ko "le modèle keepalived contient une adresse écrite en dur : $(adresses_en_dur config/keepalived.conf.modele | head -1)"; else ok "le modèle keepalived ne contient aucune adresse IP (hors 127.0.0.1)"; fi
+  porteurs=""
+  for lb in $(noeuds_hote lb | awk '{ print $1 }'); do
+    etat=$(vssh "$lb" "systemctl is-active keepalived; ip -o -4 addr show | grep -c ' $vip/'")
+    if [[ $(head -1 <<<"$etat") == active ]]; then ok "$lb : keepalived actif"; else ko "$lb : keepalived $(head -1 <<<"$etat")"; fi
+    if [[ $(tail -1 <<<"$etat") == 1 ]]; then porteurs+="$lb "; fi
+  done
+  if [[ $porteurs =~ ^[a-z0-9]+\ $ ]]; then ok "un seul répartiteur porte $vip : ${porteurs% }"; else ko "porteur(s) de $vip : « ${porteurs% } » (exactement un attendu)"; fi
+  repond=$(curl -s --max-time 5 "http://$vip/lb-sante" | sed -nE 's/.*"repartiteur":"([^"]*)".*/\1/p')
+  if [[ -n $repond && $repond == "${porteurs% }" ]]; then ok "http://$vip/lb-sante : répondu par $repond"; else ko "http://$vip/lb-sante : répondu par « $repond »"; fi
+fi
 
 bilan "Plateforme"

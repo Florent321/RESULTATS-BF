@@ -1,0 +1,53 @@
+This is ApacheBench, Version 2.3 <$Revision: 1934973 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 192.168.69.5 (be patient)
+Completed 200 requests
+Completed 400 requests
+Completed 600 requests
+Completed 800 requests
+Completed 1000 requests
+Completed 1200 requests
+Completed 1400 requests
+Completed 1600 requests
+Completed 1800 requests
+Completed 2000 requests
+Finished 2000 requests
+
+
+Server Software:        gunicorn
+Server Hostname:        192.168.69.5
+Server Port:            80
+
+Document Path:          /resultat?matricule=BF-2026-000042
+Document Length:        101 bytes
+
+Concurrency Level:      50
+Time taken for tests:   29.506 seconds
+Complete requests:      2000
+Failed requests:        0
+Total transferred:      456000 bytes
+HTML transferred:       202000 bytes
+Requests per second:    67.78 [#/sec] (mean)
+Time per request:       737.662 [ms] (mean)
+Time per request:       14.753 [ms] (mean, across all concurrent requests)
+Transfer rate:          15.09 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    1   0.8      1      20
+Processing:    92  729  90.6    720    1062
+Waiting:       14  728  90.8    719    1061
+Total:         94  730  90.6    721    1065
+
+Percentage of the requests served within a certain time (ms)
+  50%    721
+  66%    739
+  75%    751
+  80%    762
+  90%    847
+  95%    910
+  98%    984
+  99%   1008
+ 100%   1065 (longest request)
