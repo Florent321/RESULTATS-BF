@@ -13,3 +13,6 @@ date;commit;mode;ancien_maitre;nouveau_maitre;touchees;erreurs;plus_lente_s;coup
 2026-10-24 13:36:32;336fe6f;propre;lb2;lb1;0;0;0.02;0.0;0.0;0
 2026-10-24 13:39:45;336fe6f;propre;lb1;lb2;1;0;1.01;1.0;8.0;0
 2026-10-24 13:44:18;336fe6f;propre;lb2;lb1;0;0;0.03;0.0;0.0;0
+2026-10-26 01:59:50;05b92b2;propre;lb1;lb2;1;1;5.00;5.0;19.1;0
+2026-10-26 02:05:34;05b92b2;propre;lb2;lb1;1;1;5.00;5.0;19.5;0
+2026-10-26 02:09:00;05b92b2;brutal;lb1;lb2;1;0;3.02;3.0;13.0;0
