@@ -1,6 +1,6 @@
 # Synthèse des mesures — RÉSULTATS-BF
 
-Engendrée le 2026-10-26 02:13:51 par `tests/synthese.sh` (commit 05b92b2), depuis les
+Engendrée le 2026-10-26 07:57:32 par `tests/synthese.sh` (commit 75e38fc), depuis les
 fichiers `mesures/*.csv`. Les sorties brutes de chaque mesure sont dans
 `mesures/<scénario>-<date>/`. Durées en secondes, débits en requêtes par seconde.
 
@@ -10,6 +10,7 @@ fichiers `mesures/*.csv`. Les sorties brutes de chaque mesure sont dans
 | --- | --- | --- | --- | --- |
 | 2026-10-24 15:16:42 | c6a98f3 | 2 | app1=10 app2=10 | 0 % |
 | 2026-10-24 15:41:05 | c6a98f3 | 2 | app1=0 app2=20 | 200 % |
+| 2026-10-26 07:48:51 | 75e38fc | 2 | app1=10 app2=10 | 0 % |
 
 ## V2 — Panne d'un serveur applicatif sous charge (critère : plus d'erreur après 5 s)
 
@@ -19,6 +20,7 @@ fichiers `mesures/*.csv`. Les sorties brutes de chaque mesure sont dans
 | 2026-10-24 15:30:35 | c6a98f3 | app2 | brutal | 10320 | 5479 | 31.813 s |
 | 2026-10-24 15:54:36 | c6a98f3 | app1 | propre | 7091 | 0 | aucune erreur |
 | 2026-10-24 16:01:20 | c6a98f3 | app2 | brutal | 12109 | 0 | aucune erreur |
+| 2026-10-26 07:50:16 | 75e38fc | app2 | brutal | 3088 | 0 | aucune erreur |
 
 ## V3 — Montée en charge : ab -n 2000 -c 50 (débit par nombre de serveurs)
 
