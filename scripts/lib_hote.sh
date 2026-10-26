@@ -3,8 +3,9 @@
 # scripts/lib_hote.sh — fonctions des scripts lancés sur le POSTE HÔTE
 # =============================================================================
 # À sourcer par scripts/bascule.sh, tests/*.sh… Conçu pour Git Bash sous Windows
-# (aussi Linux et macOS) : ni python ni yq ; config/noeuds.yml est lu avec awk,
-# dans le format exact qu'écrit le Vagrantfile.
+# (et Linux) : bash 4 ou plus, GNU date, curl ; ni python ni yq : config/noeuds.yml
+# est lu avec awk, dans le format exact qu'écrit le Vagrantfile. Sous macOS, le
+# bash 3.2 et le date BSD livrés ne conviennent pas (Homebrew : bash, coreutils).
 # =============================================================================
 set -o pipefail
 
@@ -53,6 +54,71 @@ url_service() {
   adresse=$(vip_hote)
   [[ -n $adresse ]] || adresse=$(noeuds_hote lb | awk 'NR == 1 { print $2 }')
   echo "http://$adresse"
+}
+
+# --- Mesures ---------------------------------------------------------------------------
+# dossier_mesures SCENARIO : crée et affiche mesures/SCENARIO-AAAAMMJJ-HHMMSS.
+dossier_mesures() {
+  local d
+  d="mesures/$1-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$d"
+  echo "$d"
+}
+
+# ajouter_csv FICHIER ENTETE LIGNE : ajoute LIGNE, et l'en-tête si le fichier est neuf.
+ajouter_csv() {
+  [[ -s $1 ]] || echo "$2" >"$1"
+  echo "$3" >>"$1"
+}
+
+# commit_courant : identifiant du commit mesuré (une mesure se rattache à un code).
+commit_courant() { git rev-parse --short HEAD 2>/dev/null || echo inconnu; }
+
+# analyser_sonde FICHIER_CSV [T_PANNE_MS] : résumé d'une sonde (tests/sonde.sh).
+# Avec T_PANNE_MS, situe les erreurs par rapport à l'instant de la panne.
+analyser_sonde() {
+  awk -F';' -v panne="${2:-0}" '
+    NR == 1 { next }
+    { n++; if (NR == 2) debut = $1
+      if ($3 + 0 > lent) { lent = $3 + 0; t_lent = $1 }
+      if ($2 != 200) { e++; if (!pe) pe = $1; de = $1 } }
+    END {
+      printf "requêtes de la sonde : %d, en erreur (code différent de 200) : %d\n", n, e
+      printf "réponse la plus lente : %.2f s (à t = %+.1f s)\n", lent, (t_lent - (panne ? panne : debut)) / 1000
+      if (e) {
+        printf "première erreur : t = %+.1f s ; dernière : t = %+.1f s\n", (pe - (panne ? panne : debut)) / 1000, (de - (panne ? panne : debut)) / 1000
+        printf "période dégradée (première à dernière erreur) : %.1f s\n", (de - pe) / 1000
+      } else {
+        print "aucune erreur pendant toute la sonde"
+      }
+      if (panne) print "(t = 0 : instant de la panne)"
+    }' "$1"
+}
+
+# code_http_hote URL : code de réponse HTTP vu de l'hôte (000 : aucune réponse en 5 s).
+code_http_hote() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$1" || true; }
+
+# attendre_http_hote URL CODE DELAI_S : vrai dès que URL répond CODE, faux après DELAI_S.
+attendre_http_hote() {
+  local debut=$SECONDS
+  until [[ $(code_http_hote "$1") == "$2" ]]; do
+    (( SECONDS - debut < $3 )) || return 1
+    sleep 0.5
+  done
+}
+
+# lire_ab FICHIER CHAMP : extrait une valeur de la sortie brute d'ApacheBench.
+lire_ab() {
+  case $2 in
+    complete) awk '/^Complete requests:/ { print $3 }' "$1" ;;
+    echecs)   awk '/^Failed requests:/ { print $3 }' "$1" ;;
+    non2xx)   awk '/^Non-2xx responses:/ { print $3; t = 1 } END { if (!t) print 0 }' "$1" ;;
+    debit)    awk '/^Requests per second:/ { print $4 }' "$1" ;;
+    moyenne)  awk '/^Time per request:/ && /\(mean\)/ { print $4; exit }' "$1" ;;
+    p50)      awk '$1 == "50%" { print $2 }' "$1" ;;
+    p95)      awk '$1 == "95%" { print $2 }' "$1" ;;
+    max)      awk '$1 == "100%" { print $2 }' "$1" ;;
+  esac
 }
 
 # --- Vagrant -------------------------------------------------------------------------
@@ -144,6 +210,11 @@ vssh_suivi() { commande_vm "$@"; }
 # etat_vm MACHINE : running, poweroff, not_created, saved…
 etat_vm() {
   vagrant_borne status "$1" --machine-readable 2>/dev/null | awk -F, '$3 == "state" { print $4; exit }'
+}
+
+# etats_vm : « machine état » pour toutes les machines, en un seul appel à vagrant.
+etats_vm() {
+  vagrant_borne status --machine-readable 2>/dev/null | awk -F, '$3 == "state" { print $2, $4 }'
 }
 
 # psql_vm MACHINE REQUETE [BASE] : une valeur, en tant que postgres dans la VM.
